@@ -275,7 +275,7 @@ impl Session {
             // Emit a new heartbeat frame & panic if any failure occurred.
             let res = connection.write(heartbeat_frame.clone());
             if let Err(err) = res {
-                connection.shutdown();
+                let _err = connection.shutdown();
                 panic!("Failed to send heartbeat: {}", err);
             }
 
