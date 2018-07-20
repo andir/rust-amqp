@@ -305,7 +305,7 @@ impl Session {
                         Some(target_channel) => {
                             match target_channel.try_send(Ok(frame)) {
                                 Ok(()) => {},
-                                Err(TrySendError::Disconnected(frame)) => {
+                                Err(TrySendError::Disconnected(_frame)) => {
                                     warn!(
                                         "Error dispatching packet to channel {}: Receiver is gone.",
                                         &chan_id
