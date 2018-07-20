@@ -276,7 +276,7 @@ impl Session {
             let res = connection.write(heartbeat_frame.clone());
             if let Err(err) = res {
                 connection.shutdown();
-                panic!("Failed to send heartbeat.");
+                panic!("Failed to send heartbeat: {}", err);
             }
 
             // Sleep this thread for the configured interval, then loop.
