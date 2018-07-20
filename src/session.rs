@@ -45,7 +45,7 @@ pub struct Options {
     pub properties: Table,
 
     /// In seconds.
-    pub heartbeat: u16,
+    pub heartbeat: Option<Duration>,
 }
 
 impl Default for Options {
@@ -61,7 +61,7 @@ impl Default for Options {
             locale: "en_US".to_string(),
             scheme: AMQPScheme::AMQP,
             properties: Table::new(),
-            heartbeat: 30,
+            heartbeat: Some(Duration::from_secs(30)),
         }
     }
 }
@@ -110,11 +110,13 @@ impl Session {
         thread::spawn(|| Session::reading_loop(con1, channels_clone));
 
         // If the caller has configured heartbeats, then begin the heartbeat loop.
-        if options.heartbeat > 0 {
-            let conn = connection.clone();
-            let chans = Arc::clone(&channels);
-            let heartbeat_interval = options.heartbeat.clone();
-            thread::spawn(move || Session::heartbeat_loop(conn, heartbeat_interval));
+        match options.heartbeat {
+            Some(heartbeat) => if heartbeat > Duration::new(0, 0) {
+                let conn = connection.clone();
+                let heartbeat_interval = heartbeat.clone();
+                thread::spawn(move || Session::heartbeat_loop(conn, heartbeat_interval));
+            },
+            None => (),
         }
 
         let mut session = Session {
@@ -261,9 +263,8 @@ impl Session {
     /// Executes the heartbeat routine for the given connection.
     ///
     /// Calling this function should not take place on the main thread. Will block indefinitely.
-    fn heartbeat_loop(mut connection: Connection, heartbeat_interval: u16) -> () {
+    fn heartbeat_loop(mut connection: Connection, heartbeat_interval: Duration) -> () {
         debug!("Starting heartbeat loop.");
-        let sleep_interval = Duration::from_secs(heartbeat_interval as u64);
         let heartbeat_frame = Frame {
             frame_type: FrameType::HEARTBEAT,
             channel: 0,
@@ -279,7 +280,7 @@ impl Session {
             }
 
             // Sleep this thread for the configured interval, then loop.
-            thread::sleep(sleep_interval);
+            thread::sleep(heartbeat_interval);
         }
     }
 
@@ -406,7 +407,7 @@ fn parse_url(url_string: &str) -> AMQPResult<Options> {
 
 #[cfg(test)]
 mod test {
-    use super::{parse_url, AMQPScheme};
+    use super::{parse_url, AMQPScheme, Duration};
 
     #[test]
     fn test_full_parse_url() {
@@ -416,7 +417,7 @@ mod test {
         assert_eq!(options.password, "password");
         assert_eq!(options.port, 12345);
         assert_eq!(options.vhost, "vhost");
-        assert_eq!(options.heartbeat, 30);
+        assert_eq!(options.heartbeat, Some(Duration::from_secs(30)));
         assert!(match options.scheme { AMQPScheme::AMQP => true, _ => false });
     }
 
@@ -460,6 +461,6 @@ mod test {
         assert_eq!(options.login, "guest");
         assert_eq!(options.password, "guest");
         assert_eq!(options.port, 5672);
-        assert_eq!(options.heartbeat, 30);
+        assert_eq!(options.heartbeat, Some(Duration::from_secs(30)));
     }
 }
